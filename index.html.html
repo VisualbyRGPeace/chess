@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Cờ Vua Thư Viện — Chess</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Cormorant+Garamond:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg-outer:#111d16;
+    --bg-outer-2:#0c1610;
+    --panel-bg:#1b2b21;
+    --panel-bg-2:#213327;
+    --panel-border:#33492f;
+    --board-light:#e9ddc0;
+    --board-dark:#6b4328;
+    --board-dark-2:#5a3720;
+    --brass:#c9a24b;
+    --brass-dim:#8a7238;
+    --cream:#eee6d3;
+    --muted:#9db3a1;
+    --check-red:#b5482f;
+    --move-highlight: rgba(201,162,75,0.4);
+    --select-highlight: rgba(201,162,75,0.55);
+    --capture-ring: rgba(181,72,47,0.65);
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:
+      radial-gradient(ellipse at 20% -10%, #1b2f22 0%, transparent 55%),
+      radial-gradient(ellipse at 90% 110%, #17281c 0%, transparent 55%),
+      var(--bg-outer);
+    color:var(--cream);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body{
+    min-height:100vh;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:32px 18px 60px;
+  }
+  .wrap{
+    width:100%;
+    max-width:1180px;
+    display:grid;
+    grid-template-columns: minmax(0,1fr) 340px;
+    gap:28px;
+    align-items:start;
+  }
+  header.title{
+    grid-column:1/-1;
+    text-align:center;
+    margin-bottom:6px;
+    position:relative;
+  }
+  header.title h1{
+    font-family:'Playfair Display',serif;
+    font-weight:700;
+    font-size:clamp(28px,4vw,42px);
+    letter-spacing:0.5px;
+    margin:0;
+    color:var(--cream);
+  }
+  header.title .rule{
+    width:120px;height:2px;margin:10px auto 8px;
+    background:linear-gradient(90deg, transparent, var(--brass), transparent);
+  }
+  header.title p{
+    font-family:'Cormorant Garamond', serif;
+    font-style:italic;
+    font-size:16px;
+    color:var(--muted);
+    margin:0;
+    letter-spacing:0.3px;
+  }
+
+  /* ===== Board column ===== */
+  .board-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+  }
+  .tray{
+    width:100%;
+    max-width:640px;
+    min-height:40px;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:4px;
+    padding:6px 14px;
+    font-size:20px;
+  }
+  .tray .cap-label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    margin-right:8px;
+  }
+  .tray .piece-cap{ line-height:1; filter:drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
+
+  .board-shell{
+    position:relative;
+    padding:26px;
+    background:
+      linear-gradient(160deg, #3a2a17, #241a0f 60%, #1a130b);
+    border-radius:10px;
+    box-shadow:
+      0 24px 50px -18px rgba(0,0,0,0.7),
+      inset 0 0 0 1px rgba(201,162,75,0.25),
+      inset 0 0 40px rgba(0,0,0,0.5);
+  }
+  .board-shell::before{
+    content:"";
+    position:absolute; inset:10px;
+    border:1px solid rgba(201,162,75,0.35);
+    border-radius:4px;
+    pointer-events:none;
+  }
+  .board-grid-outer{
+    display:grid;
+    grid-template-columns: 22px repeat(8, minmax(44px,72px)) 22px;
+    grid-template-rows: 22px repeat(8, minmax(44px,72px)) 22px;
+    width:100%;
+    max-width:600px;
+  }
+  .coord{
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Cormorant Garamond', serif;
+    font-style:italic;
+    font-size:15px;
+    color:var(--brass);
+  }
+  #board{
+    grid-column:2/10;
+    grid-row:2/10;
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    grid-template-rows:repeat(8,1fr);
+    aspect-ratio:1/1;
+    border-radius:2px;
+    overflow:hidden;
+    box-shadow:0 0 0 3px #241a0f, 0 0 0 4px rgba(201,162,75,0.5);
+  }
+  .sq{
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    aspect-ratio:1/1;
+    cursor:pointer;
+    user-select:none;
+  }
+  .sq.light{ background:var(--board-light); }
+  .sq.dark{ background:var(--board-dark); background-image:linear-gradient(160deg, var(--board-dark), var(--board-dark-2)); }
+  .sq .piece{
+    font-size:clamp(28px,5vw,46px);
+    line-height:1;
+    transition:transform .12s ease;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,0.35));
+    pointer-events:none;
+  }
+  .sq.white-piece .piece{ color:#f7f1de; -webkit-text-stroke:1px #55442a; }
+  .sq.black-piece .piece{ color:#231a10; -webkit-text-stroke:0.6px #0a0a0a; }
+  .sq.selected::after{
+    content:""; position:absolute; inset:0;
+    background:var(--select-highlight);
+    box-shadow:inset 0 0 0 3px rgba(201,162,75,0.9);
+  }
+  .sq.last-move::after{
+    content:""; position:absolute; inset:0;
+    background:rgba(201,162,75,0.22);
+  }
+  .sq.legal-move::before{
+    content:"";
+    position:absolute;
+    width:28%; height:28%;
+    border-radius:50%;
+    background:var(--move-highlight);
+    z-index:2;
+  }
+  .sq.legal-capture::before{
+    content:"";
+    position:absolute; inset:6%;
+    border-radius:50%;
+    border:4px solid var(--capture-ring);
+    background:transparent;
+    z-index:2;
+  }
+  .sq.king-check::after{
+    content:"";
+    position:absolute; inset:0;
+    background:radial-gradient(circle, rgba(181,72,47,0.65), rgba(181,72,47,0.05) 70%);
+  }
+  .sq:hover .piece{ transform:scale(1.06); }
+
+  /* ===== Side panel ===== */
+  .panel{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .card{
+    background:linear-gradient(160deg, var(--panel-bg-2), var(--panel-bg));
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:16px 18px;
+  }
+  .status-card{ text-align:center; }
+  .status-turn{
+    font-family:'Playfair Display', serif;
+    font-weight:600;
+    font-size:20px;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+  }
+  .turn-dot{
+    width:14px;height:14px;border-radius:50%;
+    display:inline-block;
+    box-shadow:0 0 0 2px rgba(201,162,75,0.5);
+  }
+  .turn-dot.w{ background:#f7f1de; }
+  .turn-dot.b{ background:#231a10; }
+  .status-sub{
+    font-family:'Cormorant Garamond', serif;
+    font-style:italic;
+    color:var(--muted);
+    font-size:14px;
+    margin-top:4px;
+    min-height:18px;
+  }
+  .status-sub.check{ color:var(--check-red); font-style:normal; font-weight:600; font-family:'Inter',sans-serif; }
+
+  .card h3{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--brass);
+    margin:0 0 10px;
+    border-bottom:1px solid var(--panel-border);
+    padding-bottom:8px;
+  }
+  .movelist{
+    max-height:280px;
+    overflow-y:auto;
+    font-family:'JetBrains Mono',monospace;
+    font-size:13.5px;
+  }
+  .movelist::-webkit-scrollbar{ width:6px; }
+  .movelist::-webkit-scrollbar-thumb{ background:var(--brass-dim); border-radius:3px; }
+  .move-row{
+    display:grid;
+    grid-template-columns:32px 1fr 1fr;
+    gap:6px;
+    padding:3px 4px;
+    border-radius:4px;
+  }
+  .move-row:nth-child(odd){ background:rgba(0,0,0,0.15); }
+  .move-row .num{ color:var(--muted); }
+  .move-row span.mv{ color:var(--cream); }
+  .movelist-empty{ color:var(--muted); font-style:italic; font-family:'Cormorant Garamond',serif; font-size:15px; }
+
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  button.action{
+    flex:1;
+    min-width:90px;
+    background:linear-gradient(160deg, #2b3f2f, #1c2b21);
+    border:1px solid var(--panel-border);
+    color:var(--cream);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:0.3px;
+    padding:10px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  button.action:hover{ border-color:var(--brass); color:var(--brass); transform:translateY(-1px); }
+  button.action:active{ transform:translateY(0); }
+  button.action:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
+
+  /* promotion modal */
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:rgba(8,12,9,0.72);
+    backdrop-filter:blur(3px);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal{
+    background:linear-gradient(160deg, var(--panel-bg-2), var(--panel-bg));
+    border:1px solid var(--brass);
+    border-radius:12px;
+    padding:26px 30px;
+    text-align:center;
+    max-width:360px;
+    box-shadow:0 30px 60px rgba(0,0,0,0.6);
+  }
+  .modal h2{
+    font-family:'Playfair Display',serif;
+    margin:0 0 6px;
+    font-size:24px;
+  }
+  .modal p{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    color:var(--muted);
+    margin:0 0 18px;
+    font-size:16px;
+  }
+  .promo-choices{ display:flex; gap:10px; justify-content:center; }
+  .promo-choices button{
+    font-size:34px;
+    width:64px; height:64px;
+    border-radius:8px;
+    border:1px solid var(--panel-border);
+    background:var(--board-light);
+    cursor:pointer;
+    color:#231a10;
+    transition:all .15s ease;
+  }
+  .promo-choices button:hover{ border-color:var(--brass); transform:translateY(-3px); }
+  .modal .newgame-btn{
+    margin-top:6px;
+    background:var(--brass);
+    color:#1a130b;
+    border:none;
+    font-weight:700;
+    padding:10px 22px;
+    border-radius:8px;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+
+  @media (max-width: 860px){
+    .wrap{ grid-template-columns:1fr; }
+    .panel{ order:2; }
+  }
+
+  /* ===== Online play ===== */
+  .online-status{
+    display:flex; align-items:center; gap:8px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    margin-bottom:12px;
+    padding:8px 10px;
+    background:rgba(0,0,0,0.18);
+    border-radius:7px;
+  }
+  .online-status .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:#7a7a7a;
+    flex-shrink:0;
+  }
+  .online-status.connected .dot{ background:#5fbf6b; box-shadow:0 0 6px #5fbf6b; }
+  .online-status.waiting .dot{ background:var(--brass); box-shadow:0 0 6px var(--brass); animation:pulse 1.4s infinite; }
+  .online-status.error .dot{ background:var(--check-red); }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  .online-panel{ display:flex; flex-direction:column; gap:10px; }
+  .online-row{ display:flex; gap:8px; }
+  .online-row input{
+    flex:1;
+    background:rgba(0,0,0,0.25);
+    border:1px solid var(--panel-border);
+    color:var(--cream);
+    font-family:'JetBrains Mono',monospace;
+    font-size:14px;
+    letter-spacing:1px;
+    padding:9px 10px;
+    border-radius:7px;
+    text-transform:uppercase;
+  }
+  .online-row input:focus{ outline:none; border-color:var(--brass); }
+  .room-code-box{
+    display:flex; align-items:center; gap:8px;
+    background:rgba(0,0,0,0.25);
+    border:1px dashed var(--brass);
+    border-radius:7px;
+    padding:10px 12px;
+  }
+  .room-code-box .code{
+    font-family:'JetBrains Mono',monospace;
+    font-size:18px;
+    letter-spacing:3px;
+    color:var(--brass);
+    flex:1;
+  }
+  .room-code-box button{
+    background:transparent; border:1px solid var(--panel-border);
+    color:var(--cream); border-radius:6px; padding:5px 9px; cursor:pointer;
+    font-size:12px;
+  }
+  .room-code-box button:hover{ border-color:var(--brass); color:var(--brass); }
+  .invite-banner{
+    display:none;
+    background:linear-gradient(160deg,#3a2f14,#241d0c);
+    border:1px solid var(--brass);
+    border-radius:8px;
+    padding:12px;
+    font-size:13.5px;
+    margin-bottom:12px;
+  }
+  .invite-banner.show{ display:block; }
+  .invite-banner b{ color:var(--brass); }
+  .invite-banner button{
+    margin-top:8px;
+    background:var(--brass); color:#1a130b; border:none;
+    font-weight:700; padding:7px 16px; border-radius:6px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:13px;
+  }
+  .your-color-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:10px;
+    border:1px solid var(--panel-border);
+    margin-left:auto;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="title">
+    <h1>Cờ Vua Thư Viện</h1>
+    <div class="rule"></div>
+    <p>Một ván cờ vua đầy đủ luật — nhập thành, bắt tốt qua đường, phong cấp &amp; chiếu bí</p>
+  </header>
+
+  <div class="board-col">
+    <div class="invite-banner" id="inviteBanner">
+      <span>Bạn có lời mời tham gia phòng <b id="inviteRoomCode"></b>. Vào chơi cùng bạn bè?</span><br>
+      <button id="btnJoinInvite">Tham gia ngay</button>
+    </div>
+    <div class="tray" id="capturedByBlack"><span class="cap-label">Quân Trắng đã mất</span></div>
+    <div class="board-shell">
+      <div class="board-grid-outer" id="boardOuter">
+        <div></div><div class="coord fileL">a</div><div class="coord fileL">b</div><div class="coord fileL">c</div><div class="coord fileL">d</div><div class="coord fileL">e</div><div class="coord fileL">f</div><div class="coord fileL">g</div><div class="coord fileL">h</div><div></div>
+        <!-- rows injected via JS around #board -->
+        <div id="board"></div>
+      </div>
+    </div>
+    <div class="tray" id="capturedByWhite"><span class="cap-label">Quân Đen đã mất</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="card status-card">
+      <div class="status-turn"><span class="turn-dot w" id="turnDot"></span><span id="turnText">Trắng đi trước</span></div>
+      <div class="status-sub" id="statusSub">Ván mới bắt đầu</div>
+    </div>
+
+    <div class="card">
+      <h3>Biên bản nước đi</h3>
+      <div class="movelist" id="moveList"><div class="movelist-empty">Chưa có nước đi nào...</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Chơi online (2 người từ xa)</h3>
+      <div class="online-status" id="onlineStatus"><span class="dot"></span><span id="onlineStatusText">Chưa kết nối — đang chơi 1 máy 2 người</span></div>
+      <div class="online-panel" id="onlinePanelIdle">
+        <div class="btn-row">
+          <button class="action" id="btnCreateRoom">Tạo phòng mới</button>
+          <button class="action" id="btnShowJoin">Vào phòng bạn bè</button>
+        </div>
+        <div class="online-row" id="joinRow" style="display:none;">
+          <input id="joinCodeInput" placeholder="Nhập mã phòng" maxlength="10">
+          <button class="action" id="btnJoinRoom" style="flex:none;">Kết nối</button>
+        </div>
+      </div>
+      <div class="online-panel" id="onlinePanelHost" style="display:none;">
+        <div class="room-code-box">
+          <span class="code" id="roomCodeDisplay"></span>
+          <button id="btnCopyCode">Sao chép</button>
+          <button id="btnCopyLink">Sao chép link</button>
+        </div>
+        <div class="btn-row">
+          <button class="action" id="btnLeaveRoom">Rời phòng</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Điều khiển</h3>
+      <div class="btn-row">
+        <button class="action" id="btnNew">Ván mới</button>
+        <button class="action" id="btnUndo">Đi lại</button>
+        <button class="action" id="btnFlip">Xoay bàn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="promoOverlay">
+  <div class="modal">
+    <h2>Phong cấp</h2>
+    <p>Tốt đã đến hàng cuối. Hãy chọn quân phong cấp:</p>
+    <div class="promo-choices" id="promoChoices"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="endOverlay">
+  <div class="modal">
+    <h2 id="endTitle">Ván cờ kết thúc</h2>
+    <p id="endSub"></p>
+    <button class="newgame-btn" id="btnNewFromEnd">Ván mới</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const FILES = "abcdefgh";
+  const KNIGHT_OFFSETS = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+  const KING_OFFSETS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+  const BISHOP_DIRS = [[-1,-1],[-1,1],[1,-1],[1,1]];
+  const ROOK_DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  const UNICODE = {
+    w:{K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'},
+    b:{K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟'}
+  };
+
+  function inBounds(r,c){ return r>=0 && r<8 && c>=0 && c<8; }
+  function cloneBoard(b){ return b.map(row=>row.map(cell=>cell?{...cell}:null)); }
+  function opp(color){ return color==='w' ? 'b' : 'w'; }
+
+  function initialBoard(){
+    const back = ['R','N','B','Q','K','B','N','R'];
+    const board = Array.from({length:8},()=>Array(8).fill(null));
+    for(let c=0;c<8;c++){
+      board[0][c] = {type:back[c], color:'b'};
+      board[1][c] = {type:'P', color:'b'};
+      board[6][c] = {type:'P', color:'w'};
+      board[7][c] = {type:back[c], color:'w'};
+    }
+    return board;
+  }
+
+  function freshState(){
+    return {
+      board: initialBoard(),
+      turn: 'w',
+      castling: {wK:true, wQ:true, bK:true, bQ:true},
+      enPassant: null, // {r,c} square that can be captured onto
+      halfmoveClock: 0,
+      history: [], // {san, color, moveNumber}
+      capturedByWhite: [], // black pieces captured by white
+      capturedByWhite: [],
+      capturedByBlack: [], // white pieces captured by black
+      lastMove: null,
+      gameOver: null // {type:'checkmate'|'stalemate'|'draw', winner}
+    };
+  }
+
+  let state = freshState();
+  let selected = null; // {r,c}
+  let legalForSelected = [];
+  let flipped = false;
+  let undoStack = [];
+  let pendingPromotion = null;
+
+  function findKing(board, color){
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const p = board[r][c];
+      if(p && p.type==='K' && p.color===color) return {r,c};
+    }
+    return null;
+  }
+
+  function isSquareAttacked(board, r, c, byColor){
+    // pawn attacks
+    const pr = r + (byColor==='w' ? 1 : -1);
+    for(const dc of [-1,1]){
+      const pc = c+dc;
+      if(inBounds(pr,pc)){
+        const p = board[pr][pc];
+        if(p && p.color===byColor && p.type==='P') return true;
+      }
+    }
+    // knights
+    for(const [dr,dc] of KNIGHT_OFFSETS){
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc)){
+        const p = board[nr][nc];
+        if(p && p.color===byColor && p.type==='N') return true;
+      }
+    }
+    // king
+    for(const [dr,dc] of KING_OFFSETS){
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc)){
+        const p = board[nr][nc];
+        if(p && p.color===byColor && p.type==='K') return true;
+      }
+    }
+    // bishop/queen diagonals
+    for(const [dr,dc] of BISHOP_DIRS){
+      let nr=r+dr, nc=c+dc;
+      while(inBounds(nr,nc)){
+        const p = board[nr][nc];
+        if(p){
+          if(p.color===byColor && (p.type==='B'||p.type==='Q')) return true;
+          break;
+        }
+        nr+=dr; nc+=dc;
+      }
+    }
+    // rook/queen orthogonals
+    for(const [dr,dc] of ROOK_DIRS){
+      let nr=r+dr, nc=c+dc;
+      while(inBounds(nr,nc)){
+        const p = board[nr][nc];
+        if(p){
+          if(p.color===byColor && (p.type==='R'||p.type==='Q')) return true;
+          break;
+        }
+        nr+=dr; nc+=dc;
+      }
+    }
+    return false;
+  }
+
+  function pseudoMovesForSquare(st, r, c){
+    const piece = st.board[r][c];
+    if(!piece) return [];
+    const moves = [];
+    const color = piece.color;
+    const opponent = opp(color);
+
+    if(piece.type === 'P'){
+      const dir = color==='w' ? -1 : 1;
+      const startRow = color==='w' ? 6 : 1;
+      const promoRow = color==='w' ? 0 : 7;
+      if(inBounds(r+dir,c) && !st.board[r+dir][c]){
+        moves.push({fromR:r, fromC:c, toR:r+dir, toC:c, piece, promotion: (r+dir===promoRow)?'Q':null});
+        if(r===startRow && !st.board[r+2*dir][c]){
+          moves.push({fromR:r, fromC:c, toR:r+2*dir, toC:c, piece, isDoublePush:true});
+        }
+      }
+      for(const dc of [-1,1]){
+        const tr=r+dir, tc=c+dc;
+        if(inBounds(tr,tc)){
+          const target = st.board[tr][tc];
+          if(target && target.color===opponent){
+            moves.push({fromR:r, fromC:c, toR:tr, toC:tc, piece, captured:target, promotion:(tr===promoRow)?'Q':null});
+          } else if(!target && st.enPassant && st.enPassant.r===tr && st.enPassant.c===tc){
+            moves.push({fromR:r, fromC:c, toR:tr, toC:tc, piece, isEnPassant:true, captured:{type:'P', color:opponent}});
+          }
+        }
+      }
+    } else if(piece.type === 'N'){
+      for(const [dr,dc] of KNIGHT_OFFSETS){
+        const tr=r+dr, tc=c+dc;
+        if(inBounds(tr,tc)){
+          const target = st.board[tr][tc];
+          if(!target || target.color===opponent) moves.push({fromR:r, fromC:c, toR:tr, toC:tc, piece, captured:target||undefined});
+        }
+      }
+    } else if(piece.type === 'K'){
+      for(const [dr,dc] of KING_OFFSETS){
+        const tr=r+dr, tc=c+dc;
+        if(inBounds(tr,tc)){
+          const target = st.board[tr][tc];
+          if(!target || target.color===opponent) moves.push({fromR:r, fromC:c, toR:tr, toC:tc, piece, captured:target||undefined});
+        }
+      }
+      const rights = st.castling;
+      const homeRow = color==='w' ? 7 : 0;
+      if(r===homeRow && c===4 && !isSquareAttacked(st.board, r, c, opponent)){
+        const canK = color==='w' ? rights.wK : rights.bK;
+        const canQ = color==='w' ? rights.wQ : rights.bQ;
+        if(canK && !st.board[homeRow][5] && !st.board[homeRow][6] &&
+           st.board[homeRow][7] && st.board[homeRow][7].type==='R' && st.board[homeRow][7].color===color &&
+           !isSquareAttacked(st.board, homeRow, 5, opponent) && !isSquareAttacked(st.board, homeRow, 6, opponent)){
+          moves.push({fromR:r, fromC:c, toR:homeRow, toC:6, piece, isCastle:'K'});
+        }
+        if(canQ && !st.board[homeRow][3] && !st.board[homeRow][2] && !st.board[homeRow][1] &&
+           st.board[homeRow][0] && st.board[homeRow][0].type==='R' && st.board[homeRow][0].color===color &&
+           !isSquareAttacked(st.board, homeRow, 3, opponent) && !isSquareAttacked(st.board, homeRow, 2, opponent)){
+          moves.push({fromR:r, fromC:c, toR:homeRow, toC:2, piece, isCastle:'Q'});
+        }
+      }
+    } else {
+      let dirs = [];
+      if(piece.type==='B') dirs = BISHOP_DIRS;
+      else if(piece.type==='R') dirs = ROOK_DIRS;
+      else if(piece.type==='Q') dirs = [...BISHOP_DIRS, ...ROOK_DIRS];
+      for(const [dr,dc] of dirs){
+        let tr=r+dr, tc=c+dc;
+        while(inBounds(tr,tc)){
+          const target = st.board[tr][tc];
+          if(!target){
+            moves.push({fromR:r, fromC:c, toR:tr, toC:tc, piece});
+          } else {
+            if(target.color===opponent) moves.push({fromR:r, fromC:c, toR:tr, toC:tc, piece, captured:target});
+            break;
+          }
+          tr+=dr; tc+=dc;
+        }
+      }
+    }
+    return moves;
+  }
+
+  function applyMoveToBoard(board, move){
+    const b = cloneBoard(board);
+    const piece = b[move.fromR][move.fromC];
+    b[move.fromR][move.fromC] = null;
+    if(move.isEnPassant){
+      const capR = move.piece.color==='w' ? move.toR+1 : move.toR-1;
+      b[capR][move.toC] = null;
+    }
+    if(move.promotion){
+      b[move.toR][move.toC] = {type: move.promotion, color: piece.color};
+    } else {
+      b[move.toR][move.toC] = piece;
+    }
+    if(move.isCastle==='K'){
+      const homeRow = move.fromR;
+      b[homeRow][5] = b[homeRow][7];
+      b[homeRow][7] = null;
+    } else if(move.isCastle==='Q'){
+      const homeRow = move.fromR;
+      b[homeRow][3] = b[homeRow][0];
+      b[homeRow][0] = null;
+    }
+    return b;
+  }
+
+  function legalMovesForSquare(st, r, c){
+    const piece = st.board[r][c];
+    if(!piece || piece.color !== st.turn) return [];
+    const pseudo = pseudoMovesForSquare(st, r, c);
+    return pseudo.filter(m=>{
+      const simBoard = applyMoveToBoard(st.board, m);
+      const kp = findKing(simBoard, piece.color);
+      if(!kp) return false;
+      return !isSquareAttacked(simBoard, kp.r, kp.c, opp(piece.color));
+    });
+  }
+
+  function allLegalMoves(st, color){
+    const all = [];
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const p = st.board[r][c];
+      if(p && p.color===color) all.push(...legalMovesForSquare(st, r, c));
+    }
+    return all;
+  }
+
+  function isInCheck(st, color){
+    const kp = findKing(st.board, color);
+    if(!kp) return false;
+    return isSquareAttacked(st.board, kp.r, kp.c, opp(color));
+  }
+
+  function sqName(r,c){ return FILES[c] + (8-r); }
+
+  function computeSAN(st, move, allMovesBeforeForColor){
+    if(move.isCastle==='K') return 'O-O';
+    if(move.isCastle==='Q') return 'O-O-O';
+    const dest = sqName(move.toR, move.toC);
+    const capture = !!move.captured || !!move.isEnPassant;
+    let s = '';
+    if(move.piece.type === 'P'){
+      if(capture) s += FILES[move.fromC] + 'x';
+      s += dest;
+      if(move.promotion) s += '=' + move.promotion;
+    } else {
+      s += move.piece.type;
+      const others = allMovesBeforeForColor.filter(m=>
+        m.piece.type===move.piece.type &&
+        m.toR===move.toR && m.toC===move.toC &&
+        !(m.fromR===move.fromR && m.fromC===move.fromC)
+      );
+      if(others.length>0){
+        const sameFile = others.some(o=>o.fromC===move.fromC);
+        const sameRank = others.some(o=>o.fromR===move.fromR);
+        if(!sameFile) s += FILES[move.fromC];
+        else if(!sameRank) s += (8-move.fromR);
+        else s += FILES[move.fromC] + (8-move.fromR);
+      }
+      if(capture) s += 'x';
+      s += dest;
+    }
+    return s;
+  }
+
+  function pieceValue(type){
+    return {P:1,N:3,B:3,R:5,Q:9,K:0}[type] || 0;
+  }
+
+  function hasInsufficientMaterial(board){
+    const pieces = [];
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const p = board[r][c];
+      if(p && p.type!=='K') pieces.push(p);
+    }
+    if(pieces.length===0) return true;
+    if(pieces.length===1 && (pieces[0].type==='N' || pieces[0].type==='B')) return true;
+    if(pieces.length===2 && pieces.every(p=>p.type==='B')){
+      return true; // simplified: treat two bishops as insufficient regardless of square color for casual play
+    }
+    return false;
+  }
+
+  function makeMove(move, opts){
+    opts = opts || {};
+    if(state.gameOver) return;
+    const color = state.turn;
+    const allBefore = allLegalMoves(state, color);
+    // finalize promotion selection before SAN/apply
+    const finalize = (promoType) => {
+      const finalMove = {...move};
+      if(finalMove.promotion) finalMove.promotion = promoType;
+      const san = computeSAN(state, finalMove, allBefore);
+      const captured = finalMove.captured;
+
+      state.board = applyMoveToBoard(state.board, finalMove);
+
+      // update castling rights
+      if(finalMove.piece.type==='K'){
+        if(color==='w'){ state.castling.wK=false; state.castling.wQ=false; }
+        else { state.castling.bK=false; state.castling.bQ=false; }
+      }
+      const clearRookRight = (r,c) => {
+        if(r===7 && c===0) state.castling.wQ=false;
+        if(r===7 && c===7) state.castling.wK=false;
+        if(r===0 && c===0) state.castling.bQ=false;
+        if(r===0 && c===7) state.castling.bK=false;
+      };
+      if(finalMove.piece.type==='R') clearRookRight(finalMove.fromR, finalMove.fromC);
+      if(captured && captured.type==='R'){
+        clearRookRight(finalMove.toR, finalMove.toC);
+      }
+
+      // en passant target
+      if(finalMove.isDoublePush){
+        state.enPassant = { r:(finalMove.fromR+finalMove.toR)/2, c: finalMove.toC };
+      } else {
+        state.enPassant = null;
+      }
+
+      // halfmove clock (50-move rule) — reset on pawn move or capture
+      if(finalMove.piece.type==='P' || captured) state.halfmoveClock = 0;
+      else state.halfmoveClock++;
+
+      // captured tracking
+      if(captured){
+        if(color==='w') state.capturedByWhite.push(captured);
+        else state.capturedByBlack.push(captured);
+      }
+
+      state.lastMove = {fromR:finalMove.fromR, fromC:finalMove.fromC, toR:finalMove.toR, toC:finalMove.toC};
+      state.turn = opp(color);
+
+      const oppInCheck = isInCheck(state, state.turn);
+      const oppHasMoves = allLegalMoves(state, state.turn).length > 0;
+      let finalSan = san;
+      let gameOverInfo = null;
+      if(oppInCheck && !oppHasMoves){
+        finalSan += '#';
+        gameOverInfo = {type:'checkmate', winner: color};
+      } else if(!oppInCheck && !oppHasMoves){
+        gameOverInfo = {type:'stalemate'};
+      } else if(oppInCheck){
+        finalSan += '+';
+      } else if(state.halfmoveClock >= 100){
+        gameOverInfo = {type:'fifty-move'};
+      } else if(hasInsufficientMaterial(state.board)){
+        gameOverInfo = {type:'insufficient'};
+      }
+
+      const moveNumber = Math.floor(state.history.length/2) + 1;
+      state.history.push({san: finalSan, color, moveNumber});
+      if(gameOverInfo) state.gameOver = gameOverInfo;
+
+      selected = null;
+      legalForSelected = [];
+      renderAll();
+      if(gameOverInfo) showEndModal(gameOverInfo);
+
+      if(!opts.remote && onlineActive && conn && conn.open){
+        conn.send(JSON.stringify({
+          type:'move',
+          fromR: finalMove.fromR, fromC: finalMove.fromC,
+          toR: finalMove.toR, toC: finalMove.toC,
+          promotion: finalMove.promotion || null
+        }));
+      }
+    };
+
+    if(move.promotion && !opts.remote){
+      pendingPromotion = { finalize };
+      showPromotionModal(color);
+    } else {
+      finalize(opts.remote ? (opts.promotion || 'Q') : null);
+    }
+  }
+
+  // ===== Rendering =====
+  const boardEl = document.getElementById('board');
+  const outerEl = document.getElementById('boardOuter');
+  const turnDot = document.getElementById('turnDot');
+  const turnText = document.getElementById('turnText');
+  const statusSub = document.getElementById('statusSub');
+  const moveListEl = document.getElementById('moveList');
+  const capByWhiteEl = document.getElementById('capturedByWhite');
+  const capByBlackEl = document.getElementById('capturedByBlack');
+
+  function displayCoords(){
+    // remove old row-side coords if any, rebuild file labels order based on flip
+    const fileRow = outerEl.querySelectorAll('.fileL');
+    const files = flipped ? [...FILES].reverse() : [...FILES];
+    fileRow.forEach((el,i)=>{ el.textContent = files[i]; });
+  }
+
+  function buildBoardDom(){
+    boardEl.innerHTML = '';
+    const rowOrder = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+    const colOrder = flipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+    for(const r of rowOrder){
+      for(const c of colOrder){
+        const sq = document.createElement('div');
+        const isLight = (r+c)%2===0;
+        sq.className = 'sq ' + (isLight ? 'light' : 'dark');
+        sq.dataset.r = r;
+        sq.dataset.c = c;
+        sq.addEventListener('click', onSquareClick);
+        boardEl.appendChild(sq);
+      }
+    }
+    // rank labels on the left column (outside board, using grid row positions) -- add once
+    let ranks = outerEl.querySelectorAll('.rankL');
+    ranks.forEach(el=>el.remove());
+    const rankOrder = flipped ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
+    rankOrder.forEach((num, idx)=>{
+      const el = document.createElement('div');
+      el.className = 'coord rankL';
+      el.style.gridRow = (idx+2) + ' / ' + (idx+3);
+      el.style.gridColumn = '1 / 2';
+      el.textContent = num;
+      outerEl.appendChild(el);
+      const elR = document.createElement('div');
+      elR.className = 'coord rankL';
+      elR.style.gridRow = (idx+2) + ' / ' + (idx+3);
+      elR.style.gridColumn = '10 / 11';
+      elR.textContent = num;
+      outerEl.appendChild(elR);
+    });
+    displayCoords();
+  }
+
+  function renderBoard(){
+    const squares = boardEl.querySelectorAll('.sq');
+    const kingInCheckColor = isInCheck(state, state.turn) ? state.turn : null;
+    const kingPos = kingInCheckColor ? findKing(state.board, kingInCheckColor) : null;
+
+    squares.forEach(sq=>{
+      const r = +sq.dataset.r, c = +sq.dataset.c;
+      sq.classList.remove('selected','legal-move','legal-capture','last-move','king-check','white-piece','black-piece');
+      sq.innerHTML = '';
+      const piece = state.board[r][c];
+      if(piece){
+        const span = document.createElement('span');
+        span.className = 'piece';
+        span.textContent = UNICODE[piece.color][piece.type];
+        sq.appendChild(span);
+        sq.classList.add(piece.color==='w' ? 'white-piece' : 'black-piece');
+      }
+      if(selected && selected.r===r && selected.c===c) sq.classList.add('selected');
+      if(state.lastMove && ((state.lastMove.fromR===r && state.lastMove.fromC===c) || (state.lastMove.toR===r && state.lastMove.toC===c))){
+        sq.classList.add('last-move');
+      }
+      if(kingPos && kingPos.r===r && kingPos.c===c) sq.classList.add('king-check');
+      const legal = legalForSelected.find(m=>m.toR===r && m.toC===c);
+      if(legal){
+        sq.classList.add(legal.captured || legal.isEnPassant ? 'legal-capture' : 'legal-move');
+      }
+    });
+  }
+
+  function renderStatus(){
+    turnDot.className = 'turn-dot ' + state.turn;
+    turnText.textContent = state.turn==='w' ? 'Trắng đi' : 'Đen đi';
+    statusSub.classList.remove('check');
+    if(state.gameOver){
+      const info = state.gameOver;
+      if(info.type==='checkmate'){
+        statusSub.textContent = (info.winner==='w'?'Trắng':'Đen') + ' chiếu bí — Ván cờ kết thúc';
+        statusSub.classList.add('check');
+      } else if(info.type==='stalemate'){
+        statusSub.textContent = 'Hết nước đi — Hòa cờ';
+      } else if(info.type==='insufficient'){
+        statusSub.textContent = 'Hòa cờ — không đủ quân để chiếu bí';
+      } else if(info.type==='fifty-move'){
+        statusSub.textContent = 'Hòa cờ — luật 50 nước đi';
+      }
+    } else if(isInCheck(state, state.turn)){
+      statusSub.textContent = 'Đang bị chiếu!';
+      statusSub.classList.add('check');
+    } else {
+      statusSub.textContent = state.history.length===0 ? 'Ván mới bắt đầu' : 'Đến lượt đi';
+    }
+  }
+
+  function renderMoveList(){
+    if(state.history.length===0){
+      moveListEl.innerHTML = '<div class="movelist-empty">Chưa có nước đi nào...</div>';
+      return;
+    }
+    let html = '';
+    for(let i=0;i<state.history.length;i+=2){
+      const num = Math.floor(i/2)+1;
+      const whiteMove = state.history[i] ? state.history[i].san : '';
+      const blackMove = state.history[i+1] ? state.history[i+1].san : '';
+      html += `<div class="move-row"><span class="num">${num}.</span><span class="mv">${whiteMove}</span><span class="mv">${blackMove}</span></div>`;
+    }
+    moveListEl.innerHTML = html;
+    moveListEl.scrollTop = moveListEl.scrollHeight;
+  }
+
+  function renderCaptured(){
+    capByWhiteEl.innerHTML = '<span class="cap-label">Quân Đen đã mất</span>' +
+      state.capturedByWhite.map(p=>`<span class="piece-cap" style="color:#231a10">${UNICODE.b[p.type]}</span>`).join('');
+    capByBlackEl.innerHTML = '<span class="cap-label">Quân Trắng đã mất</span>' +
+      state.capturedByBlack.map(p=>`<span class="piece-cap" style="color:#f7f1de; -webkit-text-stroke:1px #55442a;">${UNICODE.w[p.type]}</span>`).join('');
+  }
+
+  function renderAll(){
+    renderBoard();
+    renderStatus();
+    renderMoveList();
+    renderCaptured();
+    document.getElementById('btnUndo').disabled = undoStack.length===0;
+  }
+
+  function onSquareClick(e){
+    if(state.gameOver) return;
+    if(document.getElementById('promoOverlay').classList.contains('show')) return;
+    if(onlineActive && (!conn || !conn.open)) return;
+    if(onlineActive && state.turn !== onlineColor) return;
+    const r = +this.dataset.r, c = +this.dataset.c;
+    const piece = state.board[r][c];
+
+    if(selected){
+      const move = legalForSelected.find(m=>m.toR===r && m.toC===c);
+      if(move){
+        undoStack.push(JSON.stringify(serializeState(state)));
+        makeMove(move);
+        return;
+      }
+    }
+
+    if(piece && piece.color===state.turn){
+      selected = {r,c};
+      legalForSelected = legalMovesForSquare(state, r, c);
+    } else {
+      selected = null;
+      legalForSelected = [];
+    }
+    renderBoard();
+  }
+
+  function serializeState(st){
+    return {
+      board: st.board,
+      turn: st.turn,
+      castling: st.castling,
+      enPassant: st.enPassant,
+      halfmoveClock: st.halfmoveClock,
+      history: st.history,
+      capturedByWhite: st.capturedByWhite,
+      capturedByBlack: st.capturedByBlack,
+      lastMove: st.lastMove,
+      gameOver: st.gameOver
+    };
+  }
+
+  // ===== Promotion modal =====
+  const promoOverlay = document.getElementById('promoOverlay');
+  const promoChoicesEl = document.getElementById('promoChoices');
+  function showPromotionModal(color){
+    promoChoicesEl.innerHTML = '';
+    ['Q','R','B','N'].forEach(type=>{
+      const btn = document.createElement('button');
+      btn.textContent = UNICODE[color][type];
+      btn.addEventListener('click', ()=>{
+        promoOverlay.classList.remove('show');
+        const fn = pendingPromotion.finalize;
+        pendingPromotion = null;
+        fn(type);
+      });
+      promoChoicesEl.appendChild(btn);
+    });
+    promoOverlay.classList.add('show');
+  }
+
+  // ===== End game modal =====
+  const endOverlay = document.getElementById('endOverlay');
+  const endTitle = document.getElementById('endTitle');
+  const endSub = document.getElementById('endSub');
+  function showEndModal(info){
+    if(info.type==='checkmate'){
+      endTitle.textContent = 'Chiếu bí!';
+      endSub.textContent = (info.winner==='w' ? 'Trắng' : 'Đen') + ' đã giành chiến thắng.';
+    } else if(info.type==='stalemate'){
+      endTitle.textContent = 'Hết nước đi';
+      endSub.textContent = 'Ván cờ hòa do bí nước (stalemate).';
+    } else if(info.type==='insufficient'){
+      endTitle.textContent = 'Hòa cờ';
+      endSub.textContent = 'Không bên nào còn đủ quân để chiếu bí.';
+    } else if(info.type==='fifty-move'){
+      endTitle.textContent = 'Hòa cờ';
+      endSub.textContent = 'Đã đạt luật 50 nước đi không ăn quân, không đi tốt.';
+    }
+    endOverlay.classList.add('show');
+  }
+
+  // ===== Controls =====
+  document.getElementById('btnNew').addEventListener('click', ()=>{
+    newGame();
+    if(onlineActive && conn && conn.open){
+      conn.send(JSON.stringify({type:'reset'}));
+    }
+  });
+  document.getElementById('btnNewFromEnd').addEventListener('click', ()=>{
+    endOverlay.classList.remove('show');
+    document.getElementById('btnNew').click();
+  });
+  document.getElementById('btnFlip').addEventListener('click', ()=>{
+    flipped = !flipped;
+    buildBoardDom();
+    renderAll();
+  });
+  document.getElementById('btnUndo').addEventListener('click', ()=>{
+    if(onlineActive || undoStack.length===0) return;
+    const prev = JSON.parse(undoStack.pop());
+    state = prev;
+    selected = null;
+    legalForSelected = [];
+    endOverlay.classList.remove('show');
+    renderAll();
+  });
+
+  function newGame(){
+    state = freshState();
+    selected = null;
+    legalForSelected = [];
+    undoStack = [];
+    endOverlay.classList.remove('show');
+    renderAll();
+  }
+
+  // ===== Online play (PeerJS / WebRTC, no server needed) =====
+  let peer = null;
+  let conn = null;
+  let onlineActive = false;
+  let onlineColor = null; // 'w' host, 'b' guest
+  let roomCode = null;
+
+  const ROOM_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  function generateRoomCode(len){
+    let s = '';
+    for(let i=0;i<len;i++) s += ROOM_CHARS[Math.floor(Math.random()*ROOM_CHARS.length)];
+    return s;
+  }
+
+  const onlineStatusEl = document.getElementById('onlineStatus');
+  const onlineStatusText = document.getElementById('onlineStatusText');
+  const onlinePanelIdle = document.getElementById('onlinePanelIdle');
+  const onlinePanelHost = document.getElementById('onlinePanelHost');
+  const joinRow = document.getElementById('joinRow');
+  const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+
+  function setOnlineStatus(mode, text){
+    onlineStatusEl.className = 'online-status' + (mode ? ' '+mode : '');
+    onlineStatusText.textContent = text;
+  }
+
+  function peerIdFor(code){ return 'covua-thuvien-' + code; }
+
+  function createRoom(){
+    roomCode = generateRoomCode(5);
+    setOnlineStatus('waiting', 'Đang khởi tạo phòng...');
+    peer = new Peer(peerIdFor(roomCode));
+    peer.on('open', ()=>{
+      onlinePanelIdle.style.display = 'none';
+      onlinePanelHost.style.display = 'flex';
+      roomCodeDisplay.textContent = roomCode;
+      setOnlineStatus('waiting', 'Đã tạo phòng ' + roomCode + ' — đang chờ đối thủ tham gia...');
+    });
+    peer.on('connection', (c)=>{
+      if(conn){ c.close(); return; } // only one opponent
+      conn = c;
+      onlineActive = true;
+      onlineColor = 'w';
+      flipped = false;
+      buildBoardDom();
+      setupConnection();
+    });
+    peer.on('error', (err)=>{
+      setOnlineStatus('error', 'Lỗi kết nối: ' + (err && err.type ? err.type : 'không rõ'));
+    });
+  }
+
+  function joinRoom(code){
+    code = (code||'').trim().toUpperCase();
+    if(!code){ return; }
+    roomCode = code;
+    setOnlineStatus('waiting', 'Đang kết nối tới phòng ' + code + '...');
+    peer = new Peer();
+    peer.on('open', ()=>{
+      conn = peer.connect(peerIdFor(code), {reliable:true});
+      conn.on('open', ()=>{
+        onlineActive = true;
+        onlineColor = 'b';
+        flipped = true;
+        buildBoardDom();
+        onlinePanelIdle.style.display = 'none';
+        onlinePanelHost.style.display = 'flex';
+        roomCodeDisplay.textContent = roomCode;
+        setupConnection();
+      });
+      conn.on('error', ()=>{
+        setOnlineStatus('error', 'Không tìm thấy phòng "' + code + '". Kiểm tra lại mã.');
+      });
+    });
+    peer.on('error', (err)=>{
+      setOnlineStatus('error', 'Không thể kết nối phòng "' + code + '".');
+    });
+  }
+
+  function setupConnection(){
+    setOnlineStatus('connected', 'Đã kết nối — bạn cầm quân ' + (onlineColor==='w' ? 'Trắng' : 'Đen'));
+    document.getElementById('btnUndo').disabled = true;
+    renderAll();
+
+    conn.on('data', (raw)=>{
+      let msg;
+      try{ msg = JSON.parse(raw); }catch(e){ return; }
+      if(msg.type === 'move'){
+        const candidates = legalMovesForSquare(state, msg.fromR, msg.fromC);
+        const mv = candidates.find(m=>m.toR===msg.toR && m.toC===msg.toC);
+        if(mv){
+          makeMove(mv, {remote:true, promotion: msg.promotion});
+        }
+      } else if(msg.type === 'reset'){
+        newGame();
+        document.getElementById('btnUndo').disabled = true;
+      }
+    });
+    conn.on('close', ()=>{
+      setOnlineStatus('error', 'Đối thủ đã rời phòng. Bạn có thể tạo phòng mới.');
+      onlineActive = false;
+      onlineColor = null;
+      conn = null;
+    });
+  }
+
+  function leaveRoom(){
+    if(conn){ try{ conn.close(); }catch(e){} }
+    if(peer){ try{ peer.destroy(); }catch(e){} }
+    conn = null; peer = null; onlineActive = false; onlineColor = null; roomCode = null;
+    flipped = false;
+    buildBoardDom();
+    newGame();
+    document.getElementById('btnUndo').disabled = undoStack.length===0;
+    onlinePanelIdle.style.display = 'flex';
+    onlinePanelHost.style.display = 'none';
+    joinRow.style.display = 'none';
+    setOnlineStatus('', 'Chưa kết nối — đang chơi 1 máy 2 người');
+  }
+
+  document.getElementById('btnCreateRoom').addEventListener('click', createRoom);
+  document.getElementById('btnShowJoin').addEventListener('click', ()=>{
+    joinRow.style.display = joinRow.style.display==='none' ? 'flex' : 'none';
+  });
+  document.getElementById('btnJoinRoom').addEventListener('click', ()=>{
+    joinRoom(document.getElementById('joinCodeInput').value);
+  });
+  document.getElementById('joinCodeInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') joinRoom(document.getElementById('joinCodeInput').value);
+  });
+  document.getElementById('btnLeaveRoom').addEventListener('click', leaveRoom);
+  document.getElementById('btnCopyCode').addEventListener('click', ()=>{
+    navigator.clipboard.writeText(roomCode).catch(()=>{});
+  });
+  document.getElementById('btnCopyLink').addEventListener('click', ()=>{
+    const url = location.origin + location.pathname + '?room=' + roomCode;
+    navigator.clipboard.writeText(url).catch(()=>{});
+  });
+
+  // Invite link handling: ?room=XXXXX
+  (function checkInviteLink(){
+    const params = new URLSearchParams(location.search);
+    const room = params.get('room');
+    if(room){
+      const banner = document.getElementById('inviteBanner');
+      document.getElementById('inviteRoomCode').textContent = room.toUpperCase();
+      banner.classList.add('show');
+      document.getElementById('btnJoinInvite').addEventListener('click', ()=>{
+        banner.classList.remove('show');
+        joinRoom(room);
+      });
+    }
+  })();
+
+  buildBoardDom();
+  renderAll();
+})();
+</script>
+</body>
+</html>

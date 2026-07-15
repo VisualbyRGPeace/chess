@@ -597,6 +597,33 @@ const DEFAULT_PIECES = {"wK": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPA
 
   function pieceKey(color, type){ return color + type; }
 
+  function resizeImageFile(file, maxSize){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const img = new Image();
+        img.onload = ()=>{
+          let w = img.naturalWidth, h = img.naturalHeight;
+          const scale = Math.min(1, maxSize / Math.max(w, h));
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0,0,w,h);
+          ctx.drawImage(img, 0, 0, w, h);
+          try{
+            resolve(canvas.toDataURL('image/png'));
+          }catch(err){ reject(err); }
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   function getPieceImage(color, type){
     const key = pieceKey(color, type);
     return customPieces[key] || (typeof DEFAULT_PIECES !== 'undefined' ? DEFAULT_PIECES[key] : null) || null;
@@ -653,17 +680,21 @@ const DEFAULT_PIECES = {"wK": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPA
         input.addEventListener('change', (e)=>{
           const file = e.target.files[0];
           if(!file) return;
-          const reader = new FileReader();
-          reader.onload = ()=>{
-            customPieces[key] = reader.result;
+          resizeImageFile(file, 300).then((dataUrl)=>{
+            customPieces[key] = dataUrl;
             saveCustomPieces();
             buildPieceCustomGrid();
             renderAll();
             if(onlineActive && conn && conn.open){
-              conn.send(JSON.stringify({type:'pieceImage', key, dataUrl:reader.result}));
+              try{
+                conn.send(JSON.stringify({type:'pieceImage', key, dataUrl}));
+              }catch(err){
+                alert('Không gửi được ảnh cho đối thủ, thử tải lại ảnh nhỏ hơn.');
+              }
             }
-          };
-          reader.readAsDataURL(file);
+          }).catch(()=>{
+            alert('Không đọc được ảnh này, thử ảnh khác nhé.');
+          });
         });
         slot.appendChild(input);
 
